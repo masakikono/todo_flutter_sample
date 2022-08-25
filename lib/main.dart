@@ -1,67 +1,84 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'package:todo_app/add/add_page.dart';
+import 'package:todo_app/main_model.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+        title: 'To Do App',
+        home: MyHomePage();
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
+class MainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
+    return ChangeNotifierProvider<MainModel>(
+      create: (_) =>
+      MainModel()
+        ..getTodoListRealtime(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('To Do App'),
+          actions: [
+            Consumer<MainModel>(builder: (context, model, child) {
+              final isActive = model.checkShoulActiveCompleteButton();
+              return TextButton(
+                onPressed: isActive ? () async {
+                  await model.deleteCheckedItems();
+                } : null,
+                child: Text('完了',
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.white.withOpacity(
+                        0.5),
+                  ),
+                ),
+              );
+            })
           ],
         ),
+        body: Consumer<MainModel>(builder: (context, model, child) {
+          final todoList = model.todoList;
+          return ListView(
+            children: todoList.map(
+                  (todo) =>
+                  CheckboxListTile(
+                    title: Text(todo.title),
+                    value: todo.isDone,
+                    onChanged: (bool value) {
+                      todo.isDone = !todo.isDone;
+                      model.reload();
+                    },
+                  ),
+                )
+                .toList(),
+          );
+        }),
+        floatingActionButton: Consumer<MainModel>(builder: (context, model, child) {
+          return FloatingActionButton(
+              onPressed: () async {
+                await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => AddPage(model),
+                        fullscreenDialog: true,
+                    ),
+                );
+              },
+            child: Icon(Icons.add),
+          );
+        }),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
